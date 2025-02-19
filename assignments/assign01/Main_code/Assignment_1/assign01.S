@@ -34,6 +34,8 @@
 .equ    SET_VALUE_0, 0
 
 .equ    SRAM_BANK, 0x20000000       @ Sram bank for vtor
+.equ    INTERVAL_STORAGE, 0x20040000         @ Storage for interval
+.equ    STATE_STORAGE, 0x20041000            @ Storgae for flashing state
 .equ    IO_BANK_SUM, 0x2001
 .equ    IO_BANK_SUM_NO_ALARM, 0x4440000
 
@@ -41,7 +43,10 @@ alarm_interrupt_handler:
 
         push    {lr}                    @ Push to stack since nested loops
 
-        cmp     r5, #LED_VAL_ON         @ Check to see if led is in flashing state
+        ldr     r0, =STATE_STORAGE
+        ldr     r1, [r0]
+
+        cmp     r1, #LED_VAL_ON         @ Check to see if led is in flashing state
         bne     led_flash_off           @ Branch if led should not be flashed
 
         movs    r0, #GPIO_LED_PIN       
@@ -79,7 +84,9 @@ led_flash_off:                          @ branch location for if not in flashing
         ldr     r0, =(TIMER_BASE + 0x28)                  @ Set desired delay time - TIMERAWL, Used because no side effect unlike TIMELW
         ldr     r1, [r0]
         ldr     r3, =(TIMER_BASE + 0x10)                  @ ALARM0 configureation address
-        add     r1, r1, r6
+        ldr     r4, =INTERVAL_STORAGE
+        ldr     r2, [r4]
+        add     r1, r1, r2
         str     r1, [r3, 0]
 
         pop     {pc}
@@ -111,41 +118,68 @@ gpio_interrupt:
 
 gpio_20_hanlder:
 
-        cmp     r5, #LED_VAL_OFF                                        @ If not blinking then reset to inital blink interval
+        ldr     r0, =STATE_STORAGE
+        ldr     r1, [r0]
+
+        cmp     r1, #LED_VAL_OFF                                        @ If not blinking then reset to inital blink interval
         beq     reset_interval
 
-        lsrs     r6, r6, #1                     	                @ Bit shift to half the value
+        ldr     r0, =INTERVAL_STORAGE
+
+        ldr     r1, [r0]
+
+        lsrs    r1, r1, #1                     	                @ Bit shift to half the value
+
+        str     r1, [r0, 0]
         
         bl      clear
 
 
 gpio_21_hanlder:
 
-        cmp     r5, #LED_VAL_ON                                         @ If value is high set low other wise set high
+        ldr     r0, =STATE_STORAGE
+        ldr     r1, [r0]
+
+        cmp     r1, #LED_VAL_ON                                         @ If value is high set low other wise set high
         beq     flip_21
         
-        ldr     r5, =LED_VAL_ON
+        ldr     r2, =LED_VAL_ON
+        str     r2, [r0, 0]
 
         bl      clear
 
 flip_21:
 
-        ldr     r5, =LED_VAL_OFF
+        ldr     r0, =STATE_STORAGE
+
+        ldr     r2, =LED_VAL_OFF
+        str     r2, [r0, 0]
+
         bl      clear
 
 gpio_22_hanlder:
 
-        cmp     r5, #LED_VAL_OFF                                        @ If not blinking then reset to inital blink interval
+        ldr     r0, =STATE_STORAGE
+        ldr     r1, [r0]
+
+        cmp     r1, #LED_VAL_OFF                                        @ If not blinking then reset to inital blink interval
         beq     reset_interval
 
-        lsls     r6, r6, #1                                             @ Bit shift left to double the value
+        ldr     r0, =INTERVAL_STORAGE
+        ldr     r1, [r0]
+
+        lsls     r1, r1, #1                                             @ Bit shift left to double the value
+
+        str     r1, [r0, 0]
 
         bl      clear
 
 
 reset_interval:
 
-        ldr r6, =DFLT_ALARM_TIME                                        @ Reset to inital blink interval
+        ldr     r0, =INTERVAL_STORAGE
+        ldr     r1, =DFLT_ALARM_TIME
+        str     r1, [r0, 0]                                        @ Reset to inital blink interval
 
 
 clear:
@@ -170,8 +204,14 @@ clear:
 @ Entry point to the ASM portion of the program
 main_asm:
 
-        ldr    r6, =DFLT_ALARM_TIME    @ Make r6 the variable for flashing time
-        movs    r5, #LED_VAL_ON          @ r5 will be the check registry for if the led should flash
+        ldr     r0, =INTERVAL_STORAGE
+        ldr     r1, =DFLT_ALARM_TIME    @Variable for flashing time
+        str     r1, [r0, 0]
+
+        ldr     r0, =STATE_STORAGE
+        movs    r1, #LED_VAL_ON          @ Storaging flashing value
+        str     r1, [r0, 0]
+
 
 
         @Initialise pins
@@ -221,21 +261,21 @@ main_asm:
 
         ldr     r0, =(SRAM_BANK + ALRM_ISR_OFFSET)                      @ Ram vector table address
         ldr     r1, =alarm_interrupt_handler                            @ alarm_interrupt_handler address
-        adds     r1, r1, 1
+        adds    r1, r1, 1
         str     r1, [r0, 0]                                             @ Add alarm iterrupt handler to vtor
 
 
         ldr     r0, =(SRAM_BANK + GPIO_ISR_OFFSET)                      @ Ram vector table address
         ldr     r1, =gpio_interrupt                                     @ gpio_interrupt address
-        adds     r1, r1, 1
+        adds    r1, r1, 1
         str     r1, [r0, 0]                                             @ Add gpio iterrupt handler to vtor
 
 
-        ldr    r1, =IO_BANK_SUM                                        @ Clear interrupts
+        ldr     r1, =IO_BANK_SUM                                        @ Clear interrupts
         ldr     r0, =(PPB_BASE + M0PLUS_NVIC_ICPR_OFFSET)
         str     r1, [r0, 0]
 
-        ldr    r1, =IO_BANK_SUM                                        @ Enables interrupts
+        ldr     r1, =IO_BANK_SUM                                        @ Enables interrupts
         ldr     r0, =(PPB_BASE + M0PLUS_NVIC_ISER_OFFSET)
         str     r1, [r0, 0]
 
@@ -248,7 +288,9 @@ main_asm:
         ldr     r1, [r0]
 
         ldr     r0, =(TIMER_BASE + 0x10)                  @ Set desired alarm time - ALARM0
-        add     r1, r1, r6
+        ldr     r3, =INTERVAL_STORAGE
+        ldr     r2, [r3]
+        add     r1, r1, r2
         str     r1, [r0, 0]
 
         ldr     r0, =(IO_BANK0_BASE + 0x108)              @ Enable interrupt for GPIO - PROC0_INTE2
