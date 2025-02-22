@@ -67,4 +67,3 @@ int main() {
 
     // Returning zero indicates everything went okay.
     return 0;
-}
