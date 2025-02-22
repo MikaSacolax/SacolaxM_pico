@@ -12,7 +12,7 @@
             "gdbPath" : "arm-none-eabi-gdb",
             "device": "RP2040",
             "configFiles": [
-                "interface/picoprobe.cfg",
+                "interface/interface/cmsis-dap.cfg",
                 "target/rp2040.cfg"
             ],
             "searchDir": ["D:\\Pico\\tools\\openocd-picoprobe\\scripts"],

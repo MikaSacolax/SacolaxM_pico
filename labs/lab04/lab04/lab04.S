@@ -1,4 +1,3 @@
-
 .syntax unified                 @ Specify unified assembly syntax
 .cpu    cortex-m0plus           @ Specify CPU type is Cortex M0+
 .thumb                          @ Specify thumb assembly for RP2040
