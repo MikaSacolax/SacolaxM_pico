@@ -35,7 +35,7 @@ pico_sdk_init()
 
 # Add executable. Default name is the project name, version 0.1
 
-add_executable(lab04 lab04.c )
+add_executable(lab04 lab04.c lab04.S)
 
 pico_set_program_name(lab04 "lab04")
 pico_set_program_version(lab04 "0.1")
